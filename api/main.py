@@ -200,10 +200,12 @@ def _suggestions(analysis_id: int):
         cursor.execute(
             """SELECT s.id, s.discipline_extra_id, s.target_discipline_id, s.confidence,
                       s.rationale, s.evidence, s.decision, s.coordinator_note, s.provider,
-                      s.model, s.created_at, src.nome, dst.nome
+                      s.model, s.created_at, src.nome, dst.nome, c.nome, m.codigo
                  FROM equivalencia_sugestao s
                  JOIN disciplina_extraida src ON src.id = s.discipline_extra_id
                  JOIN disciplina dst ON dst.id = s.target_discipline_id
+                 JOIN matriz m ON m.id = dst.matriz_id
+                 JOIN curso c ON c.id = m.curso_id
                 WHERE s.analysis_id = %s
                 ORDER BY s.id""",
             (analysis_id,),
@@ -224,6 +226,8 @@ def _suggestions(analysis_id: int):
             "created_at": row[10].isoformat() if row[10] else None,
             "origin_name": row[11],
             "target_name": row[12],
+            "target_course": row[13],
+            "target_matrix": row[14],
             "evidence_summary": "; ".join(
                 str(value) for value in (row[5] or {}).values() if value
             ),
@@ -602,12 +606,17 @@ def _build_agent_context(analysis_id: int):
     with obter_conexao() as connection, connection.cursor() as cursor:
         cursor.execute(
             """SELECT d.id, d.codigo, d.nome, d.carga_horaria, d.periodo,
-                      p.ementa, p.conteudo_programatico, p.objetivos
+                      p.ementa, p.conteudo_programatico, p.objetivos,
+                      c.nome, c.codigo, m.codigo
                  FROM disciplina d
+                 JOIN matriz m ON m.id = d.matriz_id
+                 JOIN curso c ON c.id = m.curso_id
                  LEFT JOIN plano_ensino p ON p.disciplina_id = d.id
-                WHERE d.matriz_id = %s
-                ORDER BY d.periodo, d.nome""",
-            (data[8],),
+                WHERE c.unidade_id = (
+                    SELECT unidade_id FROM curso WHERE id = %s
+                )
+                ORDER BY c.nome, m.codigo, d.periodo, d.nome""",
+            (data[7],),
         )
         targets = cursor.fetchall()
         cursor.execute(
@@ -633,6 +642,8 @@ def _build_agent_context(analysis_id: int):
                     "id": target[0], "code": target[1], "name": target[2],
                     "hours": target[3], "term": target[4], "syllabus": target[5],
                     "content": target[6], "objectives": target[7],
+                    "course": target[8], "course_code": target[9],
+                    "matrix": target[10],
                 },
                 "workload_check": {
                     "eligible": hours["atendido"],
@@ -643,16 +654,16 @@ def _build_agent_context(analysis_id: int):
             })
     return {
         "analysis_id": analysis_id,
-        "student": {"id": data[9], "name": data[1], "ra": data[2]},
         "origin": {"institution": data[5], "course": data[10]},
-        "destination": {"course_id": data[7], "matrix_id": data[8]},
+        "destination_scope": "Todos os cursos e matrizes da unidade do curso de destino selecionado.",
         "source_plans": [
-            {"name": name, "text": extrair_texto_documento(name, content)}
+            {"text": extrair_texto_documento(name, content)}
             for name, content in plans
         ],
         "candidates": candidates,
         "constraints": [
             "Only confirmed and explicitly approved source disciplines are eligible.",
+            "Compare every eligible source discipline against courses and matrices in the destination unit.",
             "Source workload must be equal to or greater than target workload.",
             "Never invent data; cite evidence from the source documents and target syllabus.",
             "Return suggestions only; the coordinator makes the final decision.",
@@ -770,17 +781,18 @@ def report(analysis_id: int, payload: ReportInput):
         document.add_paragraph("Matriz: " + (data["target_matrix"] or "Não informado"))
         document.add_heading("Resultado da análise", level=1)
         if data["suggestions"]:
-            table = document.add_table(rows=1, cols=4)
+            table = document.add_table(rows=1, cols=5)
             table.style = "Table Grid"
-            for cell, label in zip(table.rows[0].cells, ("Origem", "Destino", "Confiança", "Situação")):
+            for cell, label in zip(table.rows[0].cells, ("Origem", "Destino", "Curso / matriz", "Confiança", "Situação")):
                 cell.text = label
             labels = {"approved": "Aprovada", "rejected": "Não aprovada", "pending": "Pendente"}
             for item in data["suggestions"]:
                 row = table.add_row().cells
                 row[0].text = item["origin_name"]
                 row[1].text = item["target_name"]
-                row[2].text = str(item["confidence"] or "")
-                row[3].text = labels.get(item["decision"], "Pendente")
+                row[2].text = f'{item["target_course"]} / {item["target_matrix"]}'
+                row[3].text = str(item["confidence"] or "")
+                row[4].text = labels.get(item["decision"], "Pendente")
         else:
             document.add_paragraph("Nenhuma equivalência foi sugerida ou registrada manualmente.")
         if not approved:

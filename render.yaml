@@ -14,7 +14,13 @@ services:
       - key: MAX_DOCUMENT_BYTES
         value: "20971520"
       - key: AI_PROVIDER
-        value: none
+        value: gemini
+      - key: AI_AGENT_CLASS
+        value: services.equivalencia_agent:GeminiAgent
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_API_KEY
+        sync: false
       - key: DB_HOST
         sync: false
       - key: DB_PORT

@@ -16,11 +16,12 @@ O aplicativo Streamlit anterior continua disponível pelo `app.py` enquanto o fl
 
 ### Publicar um link gratuito no Render
 
-O `render.yaml` e o `Dockerfile` publicam a interface React e a API FastAPI no mesmo serviço. O PostgreSQL continua no Supabase; React não substitui o banco. No plano gratuito, o serviço do Render pode dormir após um período sem acessos e levar alguns segundos para acordar.
+O `render.yaml` e o `Dockerfile` publicam a interface React e a API FastAPI no mesmo serviço. O PostgreSQL fica em um serviço separado (por exemplo, no Render ou no Supabase); React não substitui o banco. No plano gratuito, o serviço do Render pode dormir após um período sem acessos e levar alguns segundos para acordar.
 
 1. Envie o repositório para o GitHub e, no Render, crie um **Blueprint** conectado a esse repositório. O Render encontrará o `render.yaml` automaticamente.
-2. No serviço criado, preencha `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e `DB_PASSWORD` com os dados de conexão do projeto Supabase. Se a conexão direta não funcionar na hospedagem, use os dados do **Session Pooler** do Supabase.
-3. Aguarde o deploy concluir e abra a URL `.onrender.com` informada pelo Render. O login existente usa os coordenadores e unidades do banco conectado.
+2. No serviço criado, preencha `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e `DB_PASSWORD` com os dados do banco de teste escolhido.
+3. Para habilitar as sugestões com Gemini, crie uma chave no Google AI Studio e adicione `GEMINI_API_KEY` no Environment do Render. Não coloque a chave no GitHub. O Blueprint seleciona `gemini-2.5-flash` e a integração permanece sem chamadas até a chave ser configurada.
+4. Aguarde o deploy concluir e abra a URL `.onrender.com` informada pelo Render. O login existente usa os coordenadores e unidades do banco conectado.
 
 Não coloque senhas ou chaves no GitHub nem no `render.yaml`; informe os dados do banco nos Environment Variables do serviço Render. O `SESSION_SECRET` é gerado pelo Blueprint.
 
@@ -63,8 +64,8 @@ A API aceita a origem `http://localhost:5173` por padrão. Para outro endereço,
 
 1. Localizar um cadastro de aluno ou cadastrar um novo. O mesmo cadastro pode ser reutilizado em várias análises; RA é opcional.
 2. Registrar instituição, curso e situação de origem.
-3. Selecionar curso e matriz de destino e informar o período de ingresso.
-4. Anexar o histórico (PDF ou DOCX) e, opcionalmente, vários planos de ensino da origem.
+3. Selecionar um curso de referência e sua matriz e informar o período de ingresso. A análise de IA procura disciplinas em todos os cursos/matrizes da mesma unidade.
+4. Anexar o histórico (PDF ou DOCX) e os planos/ementas da origem (PDF ou DOCX) com conteúdo e carga horária para uma análise acadêmica mais confiável.
 5. Extrair e revisar as disciplinas do histórico. Dados não identificados permanecem para correção do coordenador; documentos digitalizados sem camada de texto não têm OCR.
 6. Confirmar os dados, consultar sugestões quando um adaptador de IA estiver conectado ou registrar uma correspondência manual. Só disciplinas explicitamente aprovadas e com carga de origem igual ou superior à carga de destino podem ser associadas.
 7. Aprovar, rejeitar ou deixar pendente cada item e conferir a prévia do parecer.
@@ -74,9 +75,9 @@ A IA é uma fonte de sugestões. A decisão acadêmica continua com o coordenado
 
 ## Integração de IA
 
-`services/equivalencia_agent.py` define o contrato `EquivalenceAgent`. Um adaptador deve implementar `provider_name`, `model_name` e `analyze(context)`, retornando uma lista com `source_id`, `target_id`, `confidence`, `rationale` e `evidence`. O serviço monta o contexto com disciplinas aprovadas, matriz de destino, planos disponíveis e validações de carga horária; sugestões fora das combinações elegíveis são rejeitadas.
+`services/equivalencia_agent.py` define o contrato `EquivalenceAgent` e o adaptador REST `GeminiAgent`. Ele recebe disciplinas de origem confirmadas como aprovadas, o texto dos planos/ementas enviados e as disciplinas cadastradas em todas as matrizes dos cursos da mesma unidade do curso de referência. O nome e o RA do aluno não são enviados ao Gemini. A comparação exige carga horária de origem igual ou maior, e sugestões só podem apontar para pares previamente elegíveis. A coordenação revisa e toma a decisão final.
 
-Para registrar o adaptador, defina `AI_PROVIDER` e `AI_AGENT_CLASS=modulo:Classe`, por exemplo `services.meu_agente:MeuAgente`. Não há modelo treinado, provedor, chave de API ou chamada externa configurada neste repositório.
+O Render configura `AI_PROVIDER=gemini` e `GEMINI_MODEL=gemini-2.5-flash`; adicione `GEMINI_API_KEY` no painel do serviço. A chave é obtida no Google AI Studio. A modalidade gratuita tem limites de uso que podem mudar e o conteúdo enviado pode ser usado pelo Google para melhoria dos serviços; use somente documentos e dados de teste autorizados. Ao não configurar a chave, não há chamada externa e o fluxo manual continua disponível.
 
 ## Parecer institucional
 
