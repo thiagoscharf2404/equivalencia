@@ -16,6 +16,15 @@ _NOTA_ROTULADA = re.compile(r"\b(?:nota|m[eé]dia|conceito)\s*[:=-]?\s*(\d{1,2}(
 _CARGA_ROTULADA = re.compile(r"\b(?:carga\s*hor[aá]ria|ch)\s*[:=-]?\s*(\d{1,3})\s*(?:h|hs|horas?)?\b", re.I)
 _CARGA_COM_UNIDADE = re.compile(r"\b(\d{1,3})\s*(?:h|hs|horas?)\b", re.I)
 _CARGA_NUMERICA = re.compile(r"^\s*(\d{1,3})\s*(?:h|hs|horas?)?\s*$", re.I)
+_ROTULO_ADMINISTRATIVO = re.compile(
+    r"\b(?:atividades? complementares|carga horaria exigida|carga horaria cumprida|"
+    r"total de carga horaria|data de conclusao|data da colacao|data da expedicao do diploma)\b",
+    re.I,
+)
+_CODIGOS_ADMINISTRATIVOS = {
+    "aula", "carga", "cnpj", "cpf", "documento", "endereco", "nome",
+    "portaria", "registro", "rua", "unidade", "universidade",
+}
 _SITUACAO = re.compile(
     r"\b(aprovad[oa]|reprovad[oa]|cursando|em\s+curso|dispensad[oa]|"
     r"aproveitad[oa]|trancad[oa]|cancelad[oa]|reprovad[oa]\s+por\s+nota)\b", re.I
@@ -69,6 +78,10 @@ def _criar_registro(campos, evidencia):
             registro["codigo"] = correspondencia.group("codigo")
             registro["nome"] = correspondencia.group("resto").strip() or None
     if not registro["nome"] and not registro["codigo"]:
+        return None
+    if _ROTULO_ADMINISTRATIVO.search(_sem_acentos(evidencia)):
+        return None
+    if _sem_acentos(registro.get("codigo") or "") in _CODIGOS_ADMINISTRATIVOS:
         return None
     # Cabeçalhos e dados cadastrais costumam estar em caixa alta e eram
     # confundidos com matérias. Exigimos uma carga horária explícita e válida
