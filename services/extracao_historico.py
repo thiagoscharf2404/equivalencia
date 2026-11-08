@@ -15,6 +15,7 @@ _PERIODO = re.compile(r"(?<!\d)(?:(?:19|20)\d{2}\s*/\s*[12]|[12]\s*/\s*(?:19|20)
 _NOTA_ROTULADA = re.compile(r"\b(?:nota|m[eé]dia|conceito)\s*[:=-]?\s*(\d{1,2}(?:[,.]\d{1,2})?)\b", re.I)
 _CARGA_ROTULADA = re.compile(r"\b(?:carga\s*hor[aá]ria|ch)\s*[:=-]?\s*(\d{1,3})\s*(?:h|hs|horas?)?\b", re.I)
 _CARGA_COM_UNIDADE = re.compile(r"\b(\d{1,3})\s*(?:h|hs|horas?)\b", re.I)
+_CARGA_NUMERICA = re.compile(r"^\s*(\d{1,3})\s*(?:h|hs|horas?)?\s*$", re.I)
 _SITUACAO = re.compile(
     r"\b(aprovad[oa]|reprovad[oa]|cursando|em\s+curso|dispensad[oa]|"
     r"aproveitad[oa]|trancad[oa]|cancelad[oa]|reprovad[oa]\s+por\s+nota)\b", re.I
@@ -42,7 +43,7 @@ def _normalizar_campo(celula):
         return "nome"
     if any(palavra in texto for palavra in ("nota", "media", "conceito")):
         return "nota"
-    if any(palavra in texto for palavra in ("carga horaria", "horas", "ch")):
+    if any(palavra in texto for palavra in ("carga", "horas", "ch")):
         return "carga_horaria"
     if any(palavra in texto for palavra in ("periodo", "semestre", "ano letivo", "ano/semestre")):
         return "periodo"
@@ -68,6 +69,14 @@ def _criar_registro(campos, evidencia):
             registro["codigo"] = correspondencia.group("codigo")
             registro["nome"] = correspondencia.group("resto").strip() or None
     if not registro["nome"] and not registro["codigo"]:
+        return None
+    # Cabeçalhos e dados cadastrais costumam estar em caixa alta e eram
+    # confundidos com matérias. Exigimos uma carga horária explícita e válida
+    # para manter somente linhas que podem participar da equivalência.
+    carga = _CARGA_NUMERICA.fullmatch(registro.get("carga_horaria") or "")
+    if not carga or not 1 <= int(carga.group(1)) <= 1000:
+        return None
+    if not registro.get("nome") or len(registro["nome"].strip()) < 3:
         return None
     return registro
 
@@ -225,5 +234,8 @@ def extrair_disciplinas(nome_arquivo, conteudo):
     if not any(linha.strip() for linha in linhas):
         aviso = "Não foi possível extrair texto. O PDF pode ser uma imagem digitalizada; os dados não foram inferidos."
     elif not resultados:
-        aviso = "O texto foi lido, mas nenhuma linha de disciplina pôde ser identificada com segurança."
+        aviso = (
+            "Não encontrei disciplinas com carga horária identificável. Confira se anexou "
+            "o histórico acadêmico correto e se as linhas mostram nome e carga horária."
+        )
     return resultados, aviso
