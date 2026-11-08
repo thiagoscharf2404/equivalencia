@@ -13,9 +13,9 @@ CAMPOS = ("codigo", "nome", "nota", "carga_horaria", "periodo", "situacao")
 _CODIGO = re.compile(r"^(?P<codigo>(?=[A-Z0-9._/-]*[A-Z])[A-Z0-9][A-Z0-9._/-]{2,})\b\s*(?:[-–:]\s*)?(?P<resto>.*)$", re.I)
 _PERIODO = re.compile(r"(?<!\d)(?:(?:19|20)\d{2}\s*/\s*[12]|[12]\s*/\s*(?:19|20)\d{2})(?!\d)")
 _NOTA_ROTULADA = re.compile(r"\b(?:nota|m[eé]dia|conceito)\s*[:=-]?\s*(\d{1,2}(?:[,.]\d{1,2})?)\b", re.I)
-_CARGA_ROTULADA = re.compile(r"\b(?:carga\s*hor[aá]ria|ch)\s*[:=-]?\s*(\d{1,3})\s*(?:h|hs|horas?)?\b", re.I)
-_CARGA_COM_UNIDADE = re.compile(r"\b(\d{1,3})\s*(?:h|hs|horas?)\b", re.I)
-_CARGA_NUMERICA = re.compile(r"^\s*(\d{1,3})\s*(?:h|hs|horas?)?\s*$", re.I)
+_CARGA_ROTULADA = re.compile(r"\b(?:carga\s*hor[aá]ria|ch)\s*[:=-]?\s*\(?\s*(\d{1,3})\s*\)?\s*(?:h\s*/\s*a|h|hs|horas?)?\b", re.I)
+_CARGA_COM_UNIDADE = re.compile(r"\b\(?\s*(\d{1,3})\s*\)?\s*(?:h\s*/\s*a|h|hs|horas?)\b", re.I)
+_CARGA_NUMERICA = re.compile(r"^\s*\(?\s*(\d{1,3})\s*\)?\s*(?:h\s*/\s*a|h|hs|horas?)?\s*$", re.I)
 _ROTULO_ADMINISTRATIVO = re.compile(
     r"\b(?:atividades? complementares|carga horaria exigida|carga horaria cumprida|"
     r"total de carga horaria|data de conclusao|data da colacao|data da expedicao do diploma)\b",
@@ -27,7 +27,8 @@ _CODIGOS_ADMINISTRATIVOS = {
 }
 _SITUACAO = re.compile(
     r"\b(aprovad[oa]|reprovad[oa]|cursando|em\s+curso|dispensad[oa]|"
-    r"aproveitad[oa]|trancad[oa]|cancelad[oa]|reprovad[oa]\s+por\s+nota)\b", re.I
+    r"aproveitad[oa]|trancad[oa]|cancelad[oa]|reprovad[oa]\s+por\s+nota|"
+    r"rep\s+nota|a\s+cursar)\b", re.I
 )
 _LINHA_EQUIVALENCIA = re.compile(
     r"^\s*(?P<periodo>(?:19|20)\d{2}\s*/\s*[12]|[12]\s*/\s*(?:19|20)\d{2})"
@@ -37,6 +38,16 @@ _COLUNA_DESTINO = re.compile(r"\s{2,}(?:\d{5,8}|--)\s+[A-ZÁ-Ú]", re.I)
 _RESULTADO_EQUIVALENCIA = re.compile(
     r"^(?P<nome>.+?)\s+(?P<nota>\d{1,2}(?:[,.]\d{1,2})?)\s+(?P<carga>\d{1,3})\s*$"
 )
+_LINHA_UNIOESTE = re.compile(
+    r"^\s*(?:\d+\s*[ºªo]?\s+ano\s+)?(?P<periodo>(?:19|20)\d{2}(?:\s*/\s*[\dIVX]+)?)\s+"
+    r"(?P<codigo>[A-Z]{2,}\d{3,})\s+(?P<resto>.+)$", re.I
+)
+_LINHA_UNIPAR = re.compile(
+    r"^\s*(?:(?P<periodo>\d{1,2}\s*/\s*(?:19|20)\d{2})\s+)?"
+    r"(?P<codigo>\d{5,8})\s+(?P<resto>.*)$"
+)
+_CARGA_UNIPAR = re.compile(r"^\(?\s*(\d{1,3})\s*\)?\s*H\s*/\s*A$", re.I)
+_SITUACAO_UNIPAR = re.compile(r"^(APROVADO|APROVADA|REP\s+NOTA|A\s+CURSAR)$", re.I)
 
 
 def _sem_acentos(valor):
@@ -71,7 +82,9 @@ def _separar_colunas(linha):
 
 def _criar_registro(campos, evidencia):
     registro = {campo: (campos.get(campo) or "").strip() or None for campo in CAMPOS}
-    registro["texto_origem"] = evidencia.strip()
+    # Guarde apenas os quatro campos necessários para a análise. A linha bruta
+    # do histórico pode conter nomes de docentes, notas e dados pessoais.
+    registro["texto_origem"] = ""
     if registro["codigo"] and not registro["nome"]:
         correspondencia = _CODIGO.match(registro["codigo"])
         if correspondencia:
@@ -92,6 +105,105 @@ def _criar_registro(campos, evidencia):
     if not registro.get("nome") or len(registro["nome"].strip()) < 3:
         return None
     return registro
+
+
+def _montar_registro(codigo, nome, carga, situacao, periodo=None):
+    """Cria um registro limitado a disciplina, código, carga e situação."""
+    nome = re.sub(r"\s+", " ", nome or "").strip(" -–|\t")
+    if not nome or len(nome) < 3 or not carga or not 1 <= int(carga) <= 1000:
+        return None
+    return {
+        "codigo": codigo,
+        "nome": nome,
+        "nota": None,
+        "carga_horaria": str(int(carga)),
+        "periodo": None,
+        "situacao": situacao,
+        "texto_origem": "",
+    }
+
+
+def _ler_tabelas_historico(linhas):
+    """Lê linhas tabulares comuns em históricos da UNIPAR e da UNIOESTE."""
+    registros = []
+    indice_por_codigo = {}
+    ultimo_unioeste = None
+
+    for linha in linhas:
+        uni = _LINHA_UNIOESTE.match(linha)
+        if uni:
+            resto = uni.group("resto")
+            # A tabela UNIOESTE termina com carga, frequência, média e situação.
+            celulas = re.split(r"\s{2,}", resto.strip())
+            if len(celulas) >= 4:
+                carga = re.fullmatch(r"\d{1,3}", celulas[-4].strip())
+                situacao = celulas[-1].strip().upper()
+                if carga and situacao == "A":
+                    nome = " ".join(celulas[:-4]).strip()
+                    registro = _montar_registro(
+                        uni.group("codigo"), nome, carga.group(0), "Aprovado"
+                    )
+                    if registro:
+                        indice_por_codigo[registro["codigo"]] = len(registros)
+                        registros.append(registro)
+                        ultimo_unioeste = registro
+                        continue
+
+        unipar = _LINHA_UNIPAR.match(linha)
+        if unipar:
+            celulas = re.split(r"\s{2,}", linha.strip())
+            carga_indice = next(
+                (i for i, celula in enumerate(celulas) if _CARGA_UNIPAR.fullmatch(celula.strip())),
+                None,
+            )
+            situacao_indice = next(
+                (i for i, celula in enumerate(celulas) if _SITUACAO_UNIPAR.fullmatch(celula.strip())),
+                None,
+            )
+            if carga_indice is not None and situacao_indice is not None and len(celulas) >= 3:
+                nome = celulas[2]
+                situacao_original = celulas[situacao_indice].strip().upper()
+                situacao = {
+                    "REP NOTA": "Reprovado por nota",
+                    "A CURSAR": "A cursar",
+                }.get(situacao_original, "Aprovado")
+                registro = _montar_registro(
+                    unipar.group("codigo"),
+                    nome,
+                    _CARGA_UNIPAR.fullmatch(celulas[carga_indice].strip()).group(1),
+                    situacao,
+                )
+                if registro:
+                    indice_por_codigo[registro["codigo"]] = len(registros)
+                    registros.append(registro)
+                    ultimo_unioeste = None
+                    continue
+
+        # Nomes longos podem quebrar em linhas seguintes no PDF. Na tabela
+        # UNIPAR, a coluna de disciplina começa aproximadamente no caractere 25.
+        indentacao = len(linha) - len(linha.lstrip())
+        trecho_continuacao = linha[24:50].strip() if 24 <= indentacao < 50 else ""
+        if trecho_continuacao and re.fullmatch(r"[\wÀ-ÿ '&()/.-]+", trecho_continuacao):
+            codigo_anterior = next(
+                (codigo for codigo, indice in reversed(list(indice_por_codigo.items()))
+                 if indice == len(registros) - 1),
+                None,
+            )
+            if codigo_anterior:
+                anterior = registros[-1]
+                anterior["nome"] = f"{anterior['nome']} {trecho_continuacao}"
+                continue
+
+        # Nomes UNIOESTE também podem continuar na linha logo abaixo do código.
+        if ultimo_unioeste and 18 <= indentacao < 50:
+            trecho = linha[18:50].strip()
+            if trecho and re.fullmatch(r"[\wÀ-ÿ '&()/.-]+", trecho):
+                ultimo_unioeste["nome"] = f"{ultimo_unioeste['nome']} {trecho}".strip()
+                continue
+        if linha.strip():
+            ultimo_unioeste = None
+
+    return registros
 
 
 def _ler_linha_com_colunas(colunas, cabecalho, evidencia):
@@ -240,9 +352,34 @@ def extrair_disciplinas(nome_arquivo, conteudo):
     except Exception as erro:
         raise ValueError("Não foi possível ler o documento. Verifique se o PDF/DOCX não está corrompido ou protegido.") from erro
 
-    resultados = _interpretar_linhas_equivalencia(linhas) if extensao == ".pdf" else []
+    resultados = _ler_tabelas_historico(linhas) if extensao == ".pdf" else []
+    if not resultados:
+        resultados = _interpretar_linhas_equivalencia(linhas) if extensao == ".pdf" else []
     if not resultados:
         resultados = _interpretar_linhas(linhas)
+    # A tela de revisão e a análise precisam somente destes quatro campos;
+    # descartar nota, período e trecho bruto evita guardar conteúdo irrelevante.
+    resultados = [
+        {
+            "codigo": item.get("codigo"),
+            "nome": item.get("nome"),
+            "nota": None,
+            "carga_horaria": item.get("carga_horaria"),
+            "periodo": None,
+            "situacao": item.get("situacao"),
+            "texto_origem": "",
+        }
+        for item in resultados
+        if item.get("nome") and item.get("carga_horaria")
+    ]
+    for item in resultados:
+        status = (item.get("situacao") or "").strip().upper()
+        if status == "A":
+            item["situacao"] = "Aprovado"
+        elif status == "REP NOTA":
+            item["situacao"] = "Reprovado por nota"
+        elif status == "A CURSAR":
+            item["situacao"] = "A cursar"
     aviso = None
     if not any(linha.strip() for linha in linhas):
         aviso = "Não foi possível extrair texto. O PDF pode ser uma imagem digitalizada; os dados não foram inferidos."
