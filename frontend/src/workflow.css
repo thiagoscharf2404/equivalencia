@@ -1,0 +1,60 @@
+.student-picker{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.student-search{width:100%;max-width:440px}
+.student-results{width:100%;max-width:520px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.student-option{border:0;border-bottom:1px solid #eef0f3;background:#fff;padding:9px 11px;width:100%;display:flex;align-items:center;gap:9px;text-align:left}
+.student-option:last-child{border-bottom:0}
+.student-option:hover{background:#f7f9ff}
+.student-option>span:nth-child(2){display:flex;flex-direction:column;gap:3px;flex:1}
+.student-option strong,.selected-student strong{font-size:10px;color:#3d4a5e}
+.student-option small,.selected-student small{font-size:9px;color:#929dad}
+.student-option>svg{color:#8290a2}
+.selected-student{width:100%;max-width:520px;border:1px solid #dfe8fc;background:#f8faff;border-radius:8px;padding:12px;display:flex;align-items:center;gap:10px}
+.selected-student>div:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px}
+.register-divider{width:100%;max-width:520px;display:flex;align-items:center;gap:10px;color:#a1aab5;font-size:9px;margin:1px 0}
+.register-divider:before,.register-divider:after{content:"";height:1px;flex:1;background:#edf0f3}
+.register-form{width:100%;max-width:520px;border:1px solid var(--line);background:#fbfcfd;border-radius:8px;padding:13px;margin-top:0}
+.register-form .button{justify-self:start}
+.student-note{max-width:560px}
+.remove-file{position:relative;z-index:2;border:0;background:transparent;color:#8b96a5;padding:0 0 0 4px;vertical-align:middle;cursor:pointer}
+.remove-file:hover{color:#b2483e}
+.report-preview{display:flex;flex-direction:column;gap:12px}
+.report-ready{min-height:auto;padding:8px 15px 15px}
+.report-ready .result-icon{width:42px;height:42px}
+.report-ready h3{font-size:14px}
+.report-ready p{margin-bottom:0}
+.preview-sheet{border:1px solid #e0e4e9;border-radius:6px;background:#fff;padding:22px 24px;box-shadow:0 4px 18px #1829450a}
+.preview-brand{font:800 12px Manrope,sans-serif;color:#315fce;border-bottom:1px solid #e9edf1;padding-bottom:10px}
+.preview-brand span{font:500 9px "DM Sans",sans-serif;color:#8190a1}
+.preview-sheet>h3{font:700 15px Manrope,sans-serif;text-align:center;margin:17px 0}
+.preview-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:10px 0 17px}
+.preview-meta>div{display:flex;flex-direction:column;gap:4px}
+.preview-meta small{font-size:7px;letter-spacing:.6px;color:#98a1ae}
+.preview-meta strong{font-size:9px;color:#3e4b5e}
+.preview-table-title{font-size:9px;font-weight:700;color:#435066;padding:8px 0}
+.preview-table th{font-size:7px;padding:0 8px}
+.preview-table td{height:34px;font-size:9px;padding:5px 8px}
+.coordinator-note{margin-top:1px}
+.coordinator-note input{height:35px}
+.report-actions{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.report-actions .button{flex:none}
+@media(max-width:720px){.selected-student{flex-wrap:wrap}.selected-student .button{margin-left:40px}.report-actions{align-items:flex-start;flex-direction:column}.preview-sheet{padding:16px 12px}.preview-meta{grid-template-columns:1fr}}
+
+.manual-suggestion{display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--line);border-radius:9px;background:#fbfcfe}.manual-suggestion>div:first-child{display:flex;flex-direction:column;gap:5px}.manual-suggestion>div:first-child strong{font-size:11px}.manual-suggestion>div:first-child span,.manual-message{font-size:9px;color:#8490a0;line-height:1.45}.manual-suggestion .field select,.manual-suggestion .field input{height:38px}.manual-suggestion .button{align-self:flex-start}.student-edit-input{max-width:280px;height:32px;padding:0 8px;border:1px solid var(--line);border-radius:5px;font-size:11px;color:var(--ink)}
+.student-option-row{display:flex;align-items:center;border-bottom:1px solid #eef0f3;background:#fff}.student-option-row:last-child{border-bottom:0}.student-option-row .student-option{flex:1;border-bottom:0}.edit-student-button{border:0;background:transparent;color:#315fce;font-size:10px;font-weight:700;padding:10px 12px}.student-edit-actions{display:flex;gap:8px;align-items:center;grid-column:1/-1}
+
+/* Textos dos alunos, mensagens e parecer com aumento de 3 px. */
+.student-option strong,.selected-student strong{font-size:13px}
+.student-option small,.selected-student small{font-size:12px}
+.register-divider{font-size:12px}
+.edit-student-button{font-size:13px}
+.preview-brand{font-size:15px}
+.preview-brand span{font-size:12px}
+.preview-sheet>h3{font-size:18px}
+.preview-meta small{font-size:10px}
+.preview-meta strong{font-size:12px}
+.preview-table-title{font-size:12px}
+.preview-table th{font-size:10px}
+.preview-table td{font-size:12px}
+.manual-suggestion>div:first-child strong{font-size:14px}
+.manual-suggestion>div:first-child span,.manual-message{font-size:12px}
+.student-edit-input{font-size:14px}
