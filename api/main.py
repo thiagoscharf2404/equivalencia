@@ -547,6 +547,19 @@ def run_ai_analysis(analysis_id: int):
         _validate_agent_suggestions(suggestions, context)
         _save_suggestions(analysis_id, suggestions, agent.provider_name, agent.model_name)
     except Exception as error:
+        # Log only controlled provider/validation messages. Other exception
+        # details can include database connection data or document content.
+        diagnostic = (
+            str(error)
+            if isinstance(error, (RuntimeError, ValueError))
+            else type(error).__name__
+        )
+        logger.error(
+            "Falha na análise por IA (analysis_id=%s, tipo=%s): %s",
+            analysis_id,
+            type(error).__name__,
+            diagnostic,
+        )
         raise HTTPException(status_code=502, detail="O agente de IA não conseguiu concluir a análise.") from error
     return {"suggestions": _suggestions(analysis_id)}
 
