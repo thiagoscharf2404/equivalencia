@@ -1,0 +1,16 @@
+.env
+.git
+.venv
+__pycache__
+*.py[cod]
+node_modules
+frontend/node_modules
+frontend/dist
+frontend/.vite-cache
+.pnpm-store
+documents
+tests
+sql
+pages
+assets
+app.py

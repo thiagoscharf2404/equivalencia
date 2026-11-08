@@ -1,0 +1,12 @@
+.venv/
+node_modules/
+frontend/dist/
+frontend/.vite-cache/
+.pnpm-store/
+.env
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
